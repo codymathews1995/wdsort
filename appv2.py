@@ -138,7 +138,7 @@ def main():
     predictor = Predictor()
 
     for filename in os.listdir(args.folder):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
             image_path = os.path.join(args.folder, filename)
             tags = predictor.predict(
                 image_path,
