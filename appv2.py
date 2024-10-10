@@ -153,7 +153,11 @@ def main():
                 tag_folder = os.path.join(args.folder, first_tag)
 
                 # Create folder if it doesn't exist
-                os.makedirs(tag_folder, exist_ok=True)
+                try:
+                    os.makedirs(tag_folder, exist_ok=True)
+                except OSError as e:
+                    print(f"Skipping folder creation for '{tag_folder}': {e}")
+                    continue  # Skip to the next file
 
                 # Move the image to the new folder
                 new_image_path = os.path.join(tag_folder, filename)
