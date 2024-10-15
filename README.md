@@ -39,7 +39,7 @@ Before using **wdsort**, ensure you have the following:
 
 ## Using the Program
   ```bash
-  python appv2.py --folder "path/to/folder"
+  python wdsort.py --folder "path/to/folder"
   ```
   This should sort images based on the first tag found with an inherent bias towards any character tags identified.
 
