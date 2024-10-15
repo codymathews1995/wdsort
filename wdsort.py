@@ -16,11 +16,13 @@ kaomojis = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WaifuDiffusion Tagger CLI")
-    parser.add_argument("--folder", type=str, required=True, help="Path to the folder containing images.")
+    parser.add_argument("--folder", type=str, help="Path to the folder containing images.")
+    parser.add_argument("--scan", type=str, help="Path to a single image to scan for tags.")
     parser.add_argument("--general-thresh", type=float, default=0.35, help="General tags threshold.")
     parser.add_argument("--character-thresh", type=float, default=0.85, help="Character tags threshold.")
     parser.add_argument("--mcut-general", action="store_true", help="Use MCut threshold for general tags.")
     parser.add_argument("--mcut-character", action="store_true", help="Use MCut threshold for character tags.")
+    parser.add_argument("--bytag", type=str, help="Filter tags by specified tag.")
     return parser.parse_args()
 
 def load_labels(dataframe) -> list[str]:
@@ -96,7 +98,6 @@ class Predictor:
             print(f"Skipping prediction for {image_path} due to loading error.")
             return []  # Return an empty list or any other appropriate response
         
-        
         input_name = self.model.get_inputs()[0].name
         label_name = self.model.get_outputs()[0].name
         preds = self.model.run([label_name], {input_name: image})[0]
@@ -137,32 +138,48 @@ def main():
 
     predictor = Predictor()
 
-    for filename in os.listdir(args.folder):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
-            image_path = os.path.join(args.folder, filename)
-            tags = predictor.predict(
-                image_path,
-                args.general_thresh,
-                args.mcut_general,
-                args.character_thresh,
-                args.mcut_character,
-            )
+    if args.scan:
+        # Scan a single image
+        tags = predictor.predict(
+            args.scan,
+            args.general_thresh,
+            args.mcut_general,
+            args.character_thresh,
+            args.mcut_character,
+        )
+        print(f"Tags for {args.scan}: {tags}")
+        return
 
-            if tags:
-                first_tag = tags[0].replace(':', '-')  # Replace ":" with "-"
-                tag_folder = os.path.join(args.folder, first_tag)
+    if args.folder:
+        for filename in os.listdir(args.folder):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
+                image_path = os.path.join(args.folder, filename)
+                tags = predictor.predict(
+                    image_path,
+                    args.general_thresh,
+                    args.mcut_general,
+                    args.character_thresh,
+                    args.mcut_character,
+                )
 
-                # Create folder if it doesn't exist
-                try:
-                    os.makedirs(tag_folder, exist_ok=True)
-                except OSError as e:
-                    print(f"Skipping folder creation for '{tag_folder}': {e}")
-                    continue  # Skip to the next file
+                if args.bytag:
+                    tags = [tag for tag in tags if args.bytag in tag]
 
-                # Move the image to the new folder
-                new_image_path = os.path.join(tag_folder, filename)
-                os.rename(image_path, new_image_path)
-                print(f"Moved {filename} to {tag_folder}")
+                if tags:
+                    first_tag = tags[0].replace(':', '-')  # Replace ":" with "-"
+                    tag_folder = os.path.join(args.folder, first_tag)
+
+                    # Create folder if it doesn't exist
+                    try:
+                        os.makedirs(tag_folder, exist_ok=True)
+                    except OSError as e:
+                        print(f"Skipping folder creation for '{tag_folder}': {e}")
+                        continue  # Skip to the next file
+
+                    # Move the image to the new folder
+                    new_image_path = os.path.join(tag_folder, filename)
+                    os.rename(image_path, new_image_path)
+                    print(f"Moved {filename} to {tag_folder}")
 
 if __name__ == "__main__":
     main()
