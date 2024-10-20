@@ -5,6 +5,7 @@ import onnxruntime as rt
 import pandas as pd
 from PIL import Image
 import logging
+import cv2
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +22,7 @@ kaomojis = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WaifuDiffusion Tagger CLI")
-    parser.add_argument("--folder", type=str, help="Path to the folder containing images.")
+    parser.add_argument("--folder", type=str, help="Path to the folder containing images or videos.")
     parser.add_argument("--scan", type=str, help="Path to a single image to scan for tags.")
     parser.add_argument("--general-thresh", type=float, default=0.35, help="General tags threshold.")
     parser.add_argument("--character-thresh", type=float, default=0.85, help="Character tags threshold.")
@@ -59,13 +60,12 @@ class Predictor:
         _, height, width, _ = self.model.get_inputs()[0].shape
         self.model_target_size = height
 
-    def prepare_image(self, image_path):
-        try:
-            image = Image.open(image_path).convert("RGBA")
-        except OSError as e:
-            logger.error(f"Error opening image {image_path}: {e}")
-            return None
-        
+    def prepare_image(self, image):
+        if isinstance(image, str):
+            image = Image.open(image).convert("RGBA")
+        elif isinstance(image, np.ndarray):
+            image = Image.fromarray(image).convert("RGBA")
+
         max_dim = max(image.size)
         target_size = self.model_target_size
 
@@ -109,9 +109,8 @@ def process_single_image(predictor, image_path, args):
     tags = predictor.predict(image_path, args.general_thresh, args.mcut_general, args.character_thresh, args.mcut_character)
     
     if args.bytag:
-        tags = [tag for tag in tags if args.bytag in tag]
+        tags = [tag for tag in tags if args.bytag.lower() in tag[0].lower()]
     
-    # Log tags only when scanning a single image
     if args.scan:
         formatted_tags = "\n".join([f"- {tag[0]}: {tag[1]:.2f}" for tag in tags]) if tags else "No tags found."
         logger.info(f"Tags for {image_path}:\n{formatted_tags}")
@@ -133,19 +132,67 @@ def move_image_to_folder(image_path, tags):
 
 def process_folder_images(predictor, folder_path, args):
     for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        
+        # Process images
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
-            image_path = os.path.join(folder_path, filename)
-            tags = process_single_image(predictor, image_path, args)
+            tags = process_single_image(predictor, file_path, args)
 
-            # Filter tags if bytag is specified
             if args.bytag:
-                tags = [tag for tag in tags if args.bytag in tag]
+                tags = [tag for tag in tags if args.bytag.lower() in tag[0].lower()]
 
-            # Only move the image if there's a matching tag
             if tags:
-                move_image_to_folder(image_path, tags)
+                move_image_to_folder(file_path, tags)
             else:
                 logger.info(f"No matching tags for {filename} with filter '{args.bytag}'. Skipping move.")
+        
+        # Process videos
+        elif filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+            process_video(predictor, file_path, args)
+
+def process_video(predictor, video_path, args):
+    cap = cv2.VideoCapture(video_path)
+    
+    # Get total frame count
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    # Calculate the middle frame index
+    middle_frame_index = total_frames // 2
+    
+    # Set the video position to the middle frame
+    cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
+    
+    # Read the middle frame
+    ret, frame = cap.read()
+    cap.release()  # Release the video capture
+    
+    if not ret:
+        logger.warning(f"Could not read frame {middle_frame_index} from {video_path}.")
+        return
+    
+    # Process the middle frame
+    tags = predictor.predict(frame, args.general_thresh, args.mcut_general, args.character_thresh, args.mcut_character)
+    
+    if args.bytag:
+        tags = [tag for tag in tags if args.bytag.lower() in tag[0].lower()]
+
+    if tags:
+        logger.info(f"Tags for the middle frame of {video_path}:\n" +
+                    "\n".join([f"- {tag[0]}: {tag[1]:.2f}" for tag in tags]))
+
+        # Move the video file based on the tags
+        first_tag = tags[0][0].replace(':', '-')  # Replace ":" with "-"
+        tag_folder = os.path.join(os.path.dirname(video_path), first_tag)
+
+        try:
+            os.makedirs(tag_folder, exist_ok=True)
+            new_video_path = os.path.join(tag_folder, os.path.basename(video_path))
+            os.rename(video_path, new_video_path)
+            logger.info(f"Moved {os.path.basename(video_path)} to {tag_folder}")
+        except OSError as e:
+            logger.error(f"Skipping folder creation for '{tag_folder}': {e}")
+    else:
+        logger.info(f"No matching tags for the middle frame of {video_path} with filter '{args.bytag}'.")
 
 def main():
     args = parse_args()

@@ -1,3 +1,4 @@
 onnxruntime
 torchvision
 pandas
+opencv-python
