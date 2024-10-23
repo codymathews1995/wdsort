@@ -3,7 +3,7 @@ import os
 import numpy as np
 import onnxruntime as rt
 import pandas as pd
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import logging
 import cv2
 
@@ -24,11 +24,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="WaifuDiffusion Tagger CLI")
     parser.add_argument("--folder", type=str, help="Path to the folder containing images or videos.")
     parser.add_argument("--scan", type=str, help="Path to a single image to scan for tags.")
+    parser.add_argument("--bytag", type=str, help="Filter tags by specified tag.")
     parser.add_argument("--general-thresh", type=float, default=0.35, help="General tags threshold.")
     parser.add_argument("--character-thresh", type=float, default=0.85, help="Character tags threshold.")
     parser.add_argument("--mcut-general", action="store_true", help="Use MCut threshold for general tags.")
     parser.add_argument("--mcut-character", action="store_true", help="Use MCut threshold for character tags.")
-    parser.add_argument("--bytag", type=str, help="Filter tags by specified tag.")
     return parser.parse_args()
 
 def load_labels(dataframe) -> tuple:
@@ -61,21 +61,27 @@ class Predictor:
         self.model_target_size = height
 
     def prepare_image(self, image):
-        if isinstance(image, str):
-            image = Image.open(image).convert("RGBA")
-        elif isinstance(image, np.ndarray):
-            image = Image.fromarray(image).convert("RGBA")
+        try:
+            if isinstance(image, str):
+                logger.info(f"Attempting to open image: {image}")
+                image = Image.open(image).convert("RGBA")
+            elif isinstance(image, np.ndarray):
+                image = Image.fromarray(image).convert("RGBA")
 
-        max_dim = max(image.size)
-        target_size = self.model_target_size
+            max_dim = max(image.size)
+            target_size = self.model_target_size
 
-        padded_image = Image.new("RGB", (max_dim, max_dim), (255, 255, 255))
-        padded_image.paste(image, ((max_dim - image.size[0]) // 2, (max_dim - image.size[1]) // 2))
+            padded_image = Image.new("RGB", (max_dim, max_dim), (255, 255, 255))
+            padded_image.paste(image, ((max_dim - image.size[0]) // 2, (max_dim - image.size[1]) // 2))
 
-        if max_dim != target_size:
-            padded_image = padded_image.resize((target_size, target_size), Image.LANCZOS)
+            if max_dim != target_size:
+                padded_image = padded_image.resize((target_size, target_size), Image.LANCZOS)
 
-        return np.expand_dims(np.array(padded_image, dtype=np.float32)[:, :, ::-1], axis=0)
+            return np.expand_dims(np.array(padded_image, dtype=np.float32)[:, :, ::-1], axis=0)
+
+        except UnidentifiedImageError as e:
+            logger.warning(f"Could not identify image file {image}: {e}")
+            return None
 
     def predict(self, image_path, general_thresh, general_mcut_enabled, character_thresh, character_mcut_enabled):
         image = self.prepare_image(image_path)
@@ -147,7 +153,7 @@ def process_folder_images(predictor, folder_path, args):
                 logger.info(f"No matching tags for {filename} with filter '{args.bytag}'. Skipping move.")
         
         # Process videos
-        elif filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+        elif filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm')):
             process_video(predictor, file_path, args)
 
 def process_video(predictor, video_path, args):
