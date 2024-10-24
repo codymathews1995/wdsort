@@ -6,6 +6,8 @@ import pandas as pd
 from PIL import Image, UnidentifiedImageError
 import logging
 import cv2
+import re
+import shutil
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +23,7 @@ kaomojis = [
 ]
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="WaifuDiffusion Tagger CLI")
+    parser = argparse.ArgumentParser(description="WaifuDiffusion Tagger and Folder Organizer CLI")
     parser.add_argument("--folder", type=str, help="Path to the folder containing images or videos.")
     parser.add_argument("--scan", type=str, help="Path to a single image to scan for tags.")
     parser.add_argument("--bytag", type=str, help="Filter tags by specified tag.")
@@ -29,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--character-thresh", type=float, default=0.85, help="Character tags threshold.")
     parser.add_argument("--mcut-general", action="store_true", help="Use MCut threshold for general tags.")
     parser.add_argument("--mcut-character", action="store_true", help="Use MCut threshold for character tags.")
+    parser.add_argument("--clean", action="store_true", help="Clean and organize folders based on names in parentheses.")
     return parser.parse_args()
 
 def load_labels(dataframe) -> tuple:
@@ -159,24 +162,17 @@ def process_folder_images(predictor, folder_path, args):
 def process_video(predictor, video_path, args):
     cap = cv2.VideoCapture(video_path)
     
-    # Get total frame count
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-    # Calculate the middle frame index
     middle_frame_index = total_frames // 2
     
-    # Set the video position to the middle frame
     cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_index)
-    
-    # Read the middle frame
     ret, frame = cap.read()
-    cap.release()  # Release the video capture
+    cap.release()
     
     if not ret:
         logger.warning(f"Could not read frame {middle_frame_index} from {video_path}.")
         return
     
-    # Process the middle frame
     tags = predictor.predict(frame, args.general_thresh, args.mcut_general, args.character_thresh, args.mcut_character)
     
     if args.bytag:
@@ -186,8 +182,7 @@ def process_video(predictor, video_path, args):
         logger.info(f"Tags for the middle frame of {video_path}:\n" +
                     "\n".join([f"- {tag[0]}: {tag[1]:.2f}" for tag in tags]))
 
-        # Move the video file based on the tags
-        first_tag = tags[0][0].replace(':', '-')  # Replace ":" with "-"
+        first_tag = tags[0][0].replace(':', '-')
         tag_folder = os.path.join(os.path.dirname(video_path), first_tag)
 
         try:
@@ -200,16 +195,59 @@ def process_video(predictor, video_path, args):
     else:
         logger.info(f"No matching tags for the middle frame of {video_path} with filter '{args.bytag}'.")
 
-def main():
-    args = parse_args()
-    predictor = Predictor()
-
-    if args.scan:
-        process_single_image(predictor, args.scan, args)
+def clean_folders(folder_path):
+    """Organize directories based on names in parentheses."""
+    if not os.path.isdir(folder_path):
+        logger.error(f"The provided directory '{folder_path}' does not exist.")
         return
 
-    if args.folder:
-        process_folder_images(predictor, args.folder, args)
+    folder_names = os.listdir(folder_path)
+    
+    for folder_name in folder_names:
+        folder_path_full = os.path.join(folder_path, folder_name)
+        if os.path.isdir(folder_path_full):
+            match = re.search(r'\s*\(([^)]+)\)$', folder_name)
+            if match:
+                category = match.group(1).strip()
+                original_name = re.sub(r'\s*\([^)]*\)$', '', folder_name).strip()
+                
+                category_folder = os.path.join(folder_path, category)
+                os.makedirs(category_folder, exist_ok=True)
+                
+                new_folder_path = os.path.join(category_folder, original_name)
+                
+                if not os.path.exists(new_folder_path):
+                    try:
+                        shutil.move(folder_path_full, new_folder_path)
+                        logger.info(f"Moved folder: '{folder_path_full}' to '{new_folder_path}'")
+                    except Exception as e:
+                        logger.error(f"Error moving '{folder_path_full}': {e}")
+                else:
+                    logger.warning(f"Folder '{new_folder_path}' already exists. Skipping.")
+            else:
+                logger.info(f"No match for folder: '{folder_name}'. Skipping.")
+
+def main():
+    args = parse_args()
+    
+    if not args.folder and not args.scan:
+        logger.error("Please provide either --folder or --scan argument.")
+        return
+
+    if args.clean:
+        if args.folder:
+            logger.info("Running folder cleanup...")
+            clean_folders(args.folder)
+        else:
+            logger.error("--clean option requires --folder argument.")
+            return
+
+    if args.scan or (args.folder and not args.clean):
+        predictor = Predictor()
+        if args.scan:
+            process_single_image(predictor, args.scan, args)
+        else:
+            process_folder_images(predictor, args.folder, args)
 
 if __name__ == "__main__":
     main()
