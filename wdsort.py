@@ -10,7 +10,7 @@ import re
 import shutil
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger()
 
 # Path to the local model and labels
@@ -27,11 +27,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--folder", type=str, help="Path to the folder containing images or videos.")
     parser.add_argument("--scan", type=str, help="Path to a single image to scan for tags.")
     parser.add_argument("--bytag", type=str, help="Filter tags by specified tag.")
+    parser.add_argument("--clean", action="store_true", help="Clean and organize folders based on names in parentheses.")
+    parser.add_argument("--exclude", type=str, nargs='*', help="Exclude tags from sorting.")
     parser.add_argument("--general-thresh", type=float, default=0.35, help="General tags threshold.")
-    parser.add_argument("--character-thresh", type=float, default=0.85, help="Character tags threshold.")
+    parser.add_argument("--character-thresh", type=float, default=0.75, help="Character tags threshold.")
     parser.add_argument("--mcut-general", action="store_true", help="Use MCut threshold for general tags.")
     parser.add_argument("--mcut-character", action="store_true", help="Use MCut threshold for character tags.")
-    parser.add_argument("--clean", action="store_true", help="Clean and organize folders based on names in parentheses.")
+
     return parser.parse_args()
 
 def load_labels(dataframe) -> tuple:
@@ -66,7 +68,8 @@ class Predictor:
     def prepare_image(self, image):
         try:
             if isinstance(image, str):
-                logger.info(f"Attempting to open image: {image}")
+                file_name = os.path.basename(image)  # Get just the file name from the path
+                logger.info(f"Attempting to open image: {file_name}")  # Log the file name, not the full path
                 image = Image.open(image).convert("RGBA")
             elif isinstance(image, np.ndarray):
                 image = Image.fromarray(image).convert("RGBA")
@@ -85,6 +88,7 @@ class Predictor:
         except UnidentifiedImageError as e:
             logger.warning(f"Could not identify image file {image}: {e}")
             return None
+
 
     def predict(self, image_path, general_thresh, general_mcut_enabled, character_thresh, character_mcut_enabled):
         image = self.prepare_image(image_path)
@@ -117,6 +121,11 @@ class Predictor:
 def process_single_image(predictor, image_path, args):
     tags = predictor.predict(image_path, args.general_thresh, args.mcut_general, args.character_thresh, args.mcut_character)
     
+    # Filter tags by the exclude list if specified
+    if args.exclude:
+        exclude_tags = [tag.lower() for tag in args.exclude]
+        tags = [tag for tag in tags if tag[0].lower() not in exclude_tags]
+    
     if args.bytag:
         tags = [tag for tag in tags if args.bytag.lower() in tag[0].lower()]
     
@@ -125,6 +134,7 @@ def process_single_image(predictor, image_path, args):
         logger.info(f"Tags for {image_path}:\n{formatted_tags}")
     
     return tags
+
 
 def move_image_to_folder(image_path, tags):
     if tags:
@@ -135,7 +145,10 @@ def move_image_to_folder(image_path, tags):
             os.makedirs(tag_folder, exist_ok=True)
             new_image_path = os.path.join(tag_folder, os.path.basename(image_path))
             os.rename(image_path, new_image_path)
-            logger.info(f"Moved {os.path.basename(image_path)} to {tag_folder}")
+            
+            # Log only the folder name (not the full path)
+            folder_name = os.path.basename(tag_folder)  # Get the folder name without the full path
+            logger.info(f"Moved {os.path.basename(image_path)} to folder '{folder_name}'")
         except OSError as e:
             logger.error(f"Skipping folder creation for '{tag_folder}': {e}")
 
@@ -146,6 +159,11 @@ def process_folder_images(predictor, folder_path, args):
         # Process images
         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
             tags = process_single_image(predictor, file_path, args)
+
+            # Apply the exclude filter here as well
+            if args.exclude:
+                exclude_tags = [tag.lower() for tag in args.exclude]
+                tags = [tag for tag in tags if tag[0].lower() not in exclude_tags]
 
             if args.bytag:
                 tags = [tag for tag in tags if args.bytag.lower() in tag[0].lower()]
@@ -158,6 +176,7 @@ def process_folder_images(predictor, folder_path, args):
         # Process videos
         elif filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm')):
             process_video(predictor, file_path, args)
+
 
 def process_video(predictor, video_path, args):
     cap = cv2.VideoCapture(video_path)
@@ -175,6 +194,11 @@ def process_video(predictor, video_path, args):
     
     tags = predictor.predict(frame, args.general_thresh, args.mcut_general, args.character_thresh, args.mcut_character)
     
+    # Apply the exclude filter here for video as well
+    if args.exclude:
+        exclude_tags = [tag.lower() for tag in args.exclude]
+        tags = [tag for tag in tags if tag[0].lower() not in exclude_tags]
+
     if args.bytag:
         tags = [tag for tag in tags if args.bytag.lower() in tag[0].lower()]
 
@@ -189,11 +213,15 @@ def process_video(predictor, video_path, args):
             os.makedirs(tag_folder, exist_ok=True)
             new_video_path = os.path.join(tag_folder, os.path.basename(video_path))
             os.rename(video_path, new_video_path)
-            logger.info(f"Moved {os.path.basename(video_path)} to {tag_folder}")
+            
+            # Log only the folder name (not the full path)
+            folder_name = os.path.basename(tag_folder)  # Get the folder name without the full path
+            logger.info(f"Moved {os.path.basename(video_path)} to folder '{folder_name}'")
         except OSError as e:
             logger.error(f"Skipping folder creation for '{tag_folder}': {e}")
     else:
         logger.info(f"No matching tags for the middle frame of {video_path} with filter '{args.bytag}'.")
+
 
 def clean_folders(folder_path):
     """Organize directories based on names in parentheses."""
