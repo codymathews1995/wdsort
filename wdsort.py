@@ -224,7 +224,7 @@ def process_video(predictor, video_path, args):
 
 
 def clean_folders(folder_path):
-    """Organize directories based on names in parentheses."""
+    """Organize directories based on names in parentheses and merge if destination exists."""
     if not os.path.isdir(folder_path):
         logger.error(f"The provided directory '{folder_path}' does not exist.")
         return
@@ -234,24 +234,50 @@ def clean_folders(folder_path):
     for folder_name in folder_names:
         folder_path_full = os.path.join(folder_path, folder_name)
         if os.path.isdir(folder_path_full):
+            # Match any text (including spaces) within parentheses at the end of the folder name
             match = re.search(r'\s*\(([^)]+)\)$', folder_name)
             if match:
+                # Extract the category name and original folder name
                 category = match.group(1).strip()
                 original_name = re.sub(r'\s*\([^)]*\)$', '', folder_name).strip()
                 
+                # Define the path for the category folder
                 category_folder = os.path.join(folder_path, category)
                 os.makedirs(category_folder, exist_ok=True)
                 
+                # Define the final destination path
                 new_folder_path = os.path.join(category_folder, original_name)
                 
-                if not os.path.exists(new_folder_path):
+                # Check if the destination folder exists
+                if os.path.exists(new_folder_path):
+                    logger.info(f"Folder '{new_folder_path}' already exists. Merging contents.")
+                    # Move contents of source folder into the existing destination folder
+                    for item in os.listdir(folder_path_full):
+                        source_item_path = os.path.join(folder_path_full, item)
+                        dest_item_path = os.path.join(new_folder_path, item)
+                        
+                        try:
+                            if os.path.exists(dest_item_path):
+                                logger.info(f"File '{item}' already exists in '{new_folder_path}'. Skipping.")
+                            else:
+                                shutil.move(source_item_path, new_folder_path)
+                        except Exception as e:
+                            logger.error(f"Error moving '{source_item_path}' to '{new_folder_path}': {e}")
+                    
+                    # Remove the source folder if it’s empty after moving contents
+                    if not os.listdir(folder_path_full):
+                        os.rmdir(folder_path_full)
+                        logger.info(f"Removed empty folder: '{folder_path_full}'")
+                    else:
+                        logger.info(f"Folder '{folder_path_full}' not empty after merge.")
+                
+                else:
+                    # If the destination does not exist, move the entire folder
                     try:
                         shutil.move(folder_path_full, new_folder_path)
                         logger.info(f"Moved folder: '{folder_path_full}' to '{new_folder_path}'")
                     except Exception as e:
                         logger.error(f"Error moving '{folder_path_full}': {e}")
-                else:
-                    logger.warning(f"Folder '{new_folder_path}' already exists. Skipping.")
             else:
                 logger.info(f"No match for folder: '{folder_name}'. Skipping.")
 
