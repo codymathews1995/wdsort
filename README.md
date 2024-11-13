@@ -46,12 +46,20 @@ Before using **wdsort**, ensure you have the following:
 
 ## Using the Program
 
+First, **spawn a shell**:
+
+   ```bash
+   poetry shell
+   ```
+
+Once in the shell, you can:
+
 1. **To Scan by Folder**
 
    With a bias towards the first character identified. Otherwise, the first tag found.
 
    ```bash
-   poetry run python wdsort.py --folder "path/to/folder"
+   python wdsort.py --folder "path/to/folder"
    ```
 
 2. **To Assess Tags of Single Image**
@@ -59,7 +67,7 @@ Before using **wdsort**, ensure you have the following:
    Output all tags for a single image to the console.
 
    ```bash
-   poetry run python wdsort.py --scan "path/to/image"
+   python wdsort.py --scan "path/to/image"
    ```
 
 3. **Sort By Specific Tag**
@@ -67,7 +75,7 @@ Before using **wdsort**, ensure you have the following:
    Will sort by a specified "tag" and any combination where that tag is used (e.g., "eat" and "eating").
 
    ```bash
-   poetry run python wdsort.py --bytag "tag"
+   python wdsort.py --bytag "tag"
    ```
 
 4. **Exclude tag(s)
@@ -75,7 +83,13 @@ Before using **wdsort**, ensure you have the following:
    Will exclude the tags specified in conjunction with --folder tags
 
    ```bash
-   poetry run python wdsort.py --folder "path/to/folder" --exclude "tag1" "tag2"
+   python wdsort.py --folder "path/to/folder" --exclude "tag1" "tag2"
+   ```
+
+To exit the shell, type:
+
+   ```bash
+   exit
    ```
 
 ## Note
