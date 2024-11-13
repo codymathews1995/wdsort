@@ -14,7 +14,7 @@ This program utilizes the model from [Hugging Face - SmilingWolf/wd-v1-4-swinv2-
 Before using **wdsort**, ensure you have the following:
 
 - Python 3.7 or higher
-- Required Python libraries (listed in `requirements.txt`)
+- Poetry installed to manage dependencies
 
 ## Installation
 
@@ -24,27 +24,25 @@ Before using **wdsort**, ensure you have the following:
    git clone https://github.com/yourusername/wdsort.git
    ```
 
-2. Navigate to project directory:
+2. Navigate to the project directory:
 
    ```bash
    cd wdsort
    ```
 
-3. Create virtual environment and activate:
+3. Install dependencies using Poetry:
+
+   If you don't have Poetry installed, follow the installation instructions [here](https://python-poetry.org/docs/#installation).
+
+   Once Poetry is installed, run the following command to install the project dependencies:
 
    ```bash
-   python -m venv .venv && .venv\Scripts\Activate
+   poetry install
    ```
 
-4. Install requirements
+4. Download `model.onnx`, `selected_tags.csv`, and `config.json` from [Hugging Face](https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/tree/main).
 
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. Download model.onnx, selected_tags.csv, and config.json from [Hugging Face](https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/tree/main).s
-
-6. Place these files in model directory
+5. Place these files in the `model` directory.
 
 ## Using the Program
 
@@ -53,31 +51,39 @@ Before using **wdsort**, ensure you have the following:
    With a bias towards the first character identified. Otherwise, the first tag found.
 
    ```bash
-   python wdsort.py --folder "path/to/folder"
+   poetry run python wdsort.py --folder "path/to/folder"
    ```
 
 2. **To Assess Tags of Single Image**
 
-   Output all tags for a single image to console.
+   Output all tags for a single image to the console.
 
    ```bash
-   python wdsort.py --scan "path/to/image"
+   poetry run python wdsort.py --scan "path/to/image"
    ```
 
 3. **Sort By Specific Tag**
 
-   Will sort by specified "tag" and any combination where that tag is used (e.g., eat and eating)
+   Will sort by a specified "tag" and any combination where that tag is used (e.g., "eat" and "eating").
 
    ```bash
-   python wdsort.py --bytag "tag"
+   poetry run python wdsort.py --bytag "tag"
+   ```
+
+4. **Exclude tag(s)
+
+   Will exclude the tags specified in conjunction with --folder tags
+
+   ```bash
+   poetry run python wdsort.py --folder "path/to/folder" --exclude "tag1" "tag2"
    ```
 
 ## Note
 
-This is not the perfect solution for organizing images. I am new to programming in general, so there is still a lot of work to do. Primary credit goes to SmilingWolf for offering the model on HugggingFace.
+This is not the perfect solution for organizing images. I am new to programming in general, so there is still a lot of work to do. Primary credit goes to SmilingWolf for offering the model on HuggingFace.
 
 If this program provides any legal issues to anybody, please let me know and I will take it down promptly.
 
 ## To Do
 
-[] Add more customized sorting criteria
+- [ ] Add more customized sorting criteria
