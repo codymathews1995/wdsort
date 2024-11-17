@@ -23,6 +23,9 @@ def process_image(predictor, image_path, args):
     if args.scan:
         formatted_tags = "\n".join([f"- {tag[0]}: {tag[1]:.2f}" for tag in tags]) if tags else "No tags found."
         logger.info(f"Tags for {image_path}:\n{formatted_tags}")
+        
+    if args.characters:
+        tags = [tag for tag in tags if tag[0] in [predictor.tag_names[i] for i in predictor.character_indexes]]
     
     return tags
 
