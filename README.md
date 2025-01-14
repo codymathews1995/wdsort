@@ -14,7 +14,7 @@ This program utilizes the model from [Hugging Face - SmilingWolf/wd-v1-4-swinv2-
 Before using **wdsort**, ensure you have the following:
 
 - Python 3.7 or higher
-- Poetry installed to manage dependencies
+- The ability to manage virtual environments using `venv`
 
 ## Installation
 
@@ -30,29 +30,39 @@ Before using **wdsort**, ensure you have the following:
    cd wdsort
    ```
 
-3. Install dependencies using Poetry:
-
-   If you don't have Poetry installed, follow the installation instructions [here](https://python-poetry.org/docs/#installation).
-
-   Once Poetry is installed, run the following command to install the project dependencies:
+3. Create a virtual environment:
 
    ```bash
-   poetry install
+   python -m venv venv
    ```
 
-4. Download `model.onnx`, `selected_tags.csv`, and `config.json` from [Hugging Face](https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/tree/main).
+4. Activate the virtual environment:
 
-5. Place these files in the `model` directory.
+   - On Windows:
+
+     ```bash
+     .\venv\Scripts\activate
+     ```
+
+   - On Unix or MacOS:
+
+     ```bash
+     source venv/bin/activate
+     ```
+
+5. Install dependencies using pip:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+6. Download `model.onnx`, `selected_tags.csv`, and `config.json` from [Hugging Face](https://huggingface.co/SmilingWolf/wd-v1-4-swinv2-tagger-v2/tree/main).
+
+7. Place these files in the `model` directory.
 
 ## Using the Program
 
-First, **spawn a shell**:
-
-   ```bash
-   poetry shell
-   ```
-
-Once in the shell, you can:
+Once the virtual environment is activated, you can:
 
 1. **To Scan by Folder**
 
@@ -78,18 +88,24 @@ Once in the shell, you can:
    python wdsort.py --bytag "tag"
    ```
 
-4. **Exclude tag(s)
+4. **Exclude tag(s)**
 
-   Will exclude the tags specified in conjunction with --folder tags
+   Will exclude the tags specified in conjunction with --folder tags.
 
    ```bash
    python wdsort.py --folder "path/to/folder" --exclude "tag1" "tag2"
    ```
 
-To exit the shell, type:
+5. **Sort Files by Type and Orientation**
 
    ```bash
-   exit
+   python wdsort.py --folder "path/to/folder" --sort
+   ```
+
+To exit the virtual environment, type:
+
+   ```bash
+   deactivate
    ```
 
 ## Note

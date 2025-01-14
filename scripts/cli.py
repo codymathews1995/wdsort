@@ -9,7 +9,10 @@ def parse_args():
     parser.add_argument("--clean", action="store_true", help="Clean and organize folders based on names in parentheses.")
     parser.add_argument("--exclude", type=str, nargs='*', help="Exclude tags from sorting.")
     parser.add_argument("--characters", action="store_true", help="Only process items with identified character tags.")
-
+    
+    # Add new argument for bytype
+    parser.add_argument("--sort", action="store_true", help="Sort media files into categories.")    
+    
     parser.add_argument("--general-thresh", type=float, default=0.35, help="General tags threshold.")
     parser.add_argument("--character-thresh", type=float, default=0.75, help="Character tags threshold.")
     parser.add_argument("--mcut-general", action="store_true", help="Use MCut threshold for general tags.")

@@ -25,7 +25,10 @@ class Predictor:
         tags_df = pd.read_csv(LABEL_FILENAME)
         self.tag_names, self.rating_indexes, self.general_indexes, self.character_indexes = load_labels(tags_df)
 
-        self.model = rt.InferenceSession(MODEL_PATH)
+        # Load the model with GPU support
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']  # Set the order of providers (GPU > CPU)
+        self.model = rt.InferenceSession(MODEL_PATH, providers=providers)
+
         _, height, width, _ = self.model.get_inputs()[0].shape
         self.model_target_size = height
 

@@ -1,0 +1,4 @@
+onnxruntime-gpu
+pandas
+opencv-python
+pillow
